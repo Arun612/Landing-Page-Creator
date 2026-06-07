@@ -71,9 +71,6 @@ DALLE_API_VERSION=2024-02-01
 
 PIXABAY_API_KEY=your-pixabay-key
 ```
-
-> ⚠️ **Never commit `.env`** — it is already listed in `.gitignore`.
-
 ---
 
 ## 🚀 Usage
