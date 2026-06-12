@@ -29,9 +29,12 @@ See [WORKFLOW.md](WORKFLOW.md) for the 4-phase agent pipeline diagram.
 ## 📋 Prerequisites
 
 - **Python 3.10+**
-- **Azure OpenAI** resource with a GPT deployment (e.g. `gpt-5-mini`)
+- **One LLM provider** (pick one):
+  - **Groq** (recommended, free) — [console.groq.com](https://console.groq.com)
+  - **Ollama** (local, free) — [ollama.com](https://ollama.com)
+  - **Azure OpenAI** — org/paid access with a GPT deployment
 - *(Optional)* Azure DALL-E 3 deployment for AI image generation
-- *(Optional)* [Pixabay API key](https://pixabay.com/api/docs/) for stock photos
+- *(Optional)* [Pixabay API key](https://pixabay.com/api/docs/) for stock photos (free)
 
 ---
 
@@ -55,22 +58,22 @@ copy .env.example .env       # Windows
 # cp .env.example .env       # macOS / Linux
 ```
 
-Open `.env` in your editor and fill in your actual API keys:
+Open `.env` in your editor and fill in credentials. **Free option (Groq):**
 
 ```env
-AZURE_OPENAI_API_KEY=your-key-here
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_OPENAI_DEPLOYMENT_NAME=gpt-5-mini
-AZURE_OPENAI_API_VERSION=2024-12-01-preview
+LLM_PROVIDER=groq
+GROQ_API_KEY=your-groq-api-key
+GROQ_MODEL=llama-3.3-70b-versatile
 
-# Optional — leave blank to disable
-DALLE_API_KEY=your-dalle-key
-DALLE_ENDPOINT=https://your-resource.openai.azure.com/
-DALLE_DEPLOYMENT_NAME=dall-e-3
-DALLE_API_VERSION=2024-02-01
-
+# Optional — free Pixabay key for hero images
 PIXABAY_API_KEY=your-pixabay-key
 ```
+
+**Local free option (Ollama):** install Ollama, run `ollama pull llama3.2`, then set `LLM_PROVIDER=ollama`.
+
+See `.env.example` for Azure and optional DALL-E settings.
+
+> ⚠️ **Never commit `.env`** — it is already listed in `.gitignore`.
 ---
 
 ## 🚀 Usage

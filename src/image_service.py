@@ -10,6 +10,8 @@ from typing import Dict, List, Optional, Tuple
 import requests
 from openai import AzureOpenAI
 
+from .llm import LLMSetup, create_chat_completion
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,14 +20,12 @@ class ImageService:
 
     def __init__(
         self,
-        gpt_client: AzureOpenAI,
-        gpt_deployment: str,
+        llm_setup: LLMSetup,
         dalle_client: Optional[AzureOpenAI] = None,
         dalle_deployment: Optional[str] = None,
         pixabay_api_key: Optional[str] = None,
     ):
-        self._gpt_client = gpt_client
-        self._gpt_deployment = gpt_deployment
+        self._llm = llm_setup
         self._dalle_client = dalle_client
         self._dalle_deployment = dalle_deployment
         self._pixabay_key = pixabay_api_key
@@ -114,16 +114,16 @@ class ImageService:
             f"BUSINESS INFO:\n{text}"
         )
         try:
-            resp = self._gpt_client.chat.completions.create(
-                model=self._gpt_deployment,
+            content = create_chat_completion(
+                self._llm,
                 messages=[
                     {"role": "system", "content": "Extract concise keywords for professional image searches."},
                     {"role": "user", "content": prompt},
                 ],
-                max_completion_tokens=100,
+                max_tokens=100,
                 temperature=0,
             )
-            return [kw.strip() for kw in resp.choices[0].message.content.split(",") if kw.strip()]
+            return [kw.strip() for kw in content.split(",") if kw.strip()]
         except Exception as exc:
             logger.error("Keyword extraction failed: %s", exc)
             return ["business", "professional", "technology", "office", "modern"]

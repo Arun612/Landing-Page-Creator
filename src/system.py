@@ -26,6 +26,7 @@ from .business import enhance_business_context
 from .config import Config
 from .editor import LandingPageEditor
 from .image_service import ImageService
+from .llm import build_llm_setup, verify_llm
 from .templates import create_fallback_html, get_theme_instructions
 
 logger = logging.getLogger(__name__)
@@ -40,40 +41,21 @@ class EnhancedLandingPageCreatorSystem:
     def __init__(self, config: Config):
         self._config = config
 
-        # ── Azure OpenAI clients ─────────────────────────────
-        self._gpt_client = AzureOpenAI(
-            api_key=config.azure_openai_api_key,
-            api_version=config.azure_openai_api_version,
-            azure_endpoint=config.azure_openai_endpoint,
-        )
+        # ── LLM client (Azure, Groq, or Ollama) ──────────────
+        self._llm = build_llm_setup(config)
 
         dalle_client = None
-        if config.dalle_deployment:
+        if config.dalle_deployment and config.llm_provider == "azure":
             dalle_client = AzureOpenAI(
                 api_key=config.dalle_api_key or config.azure_openai_api_key,
                 api_version=config.dalle_api_version,
                 azure_endpoint=config.dalle_endpoint or config.azure_openai_endpoint,
             )
 
-        # ── AutoGen LLM config ──────────────────────────────
-        self._llm_config = {
-            "config_list": [
-                {
-                    "model": config.azure_openai_deployment,
-                    "api_key": config.azure_openai_api_key,
-                    "api_type": "azure",
-                    "base_url": config.azure_openai_endpoint,
-                    "api_version": config.azure_openai_api_version,
-                }
-            ],
-            "timeout": 300,
-        }
-
         # ── Sub-systems ──────────────────────────────────────
-        self._agents = create_agents(self._llm_config)
+        self._agents = create_agents(self._llm.llm_config)
         self._image_service = ImageService(
-            gpt_client=self._gpt_client,
-            gpt_deployment=config.azure_openai_deployment,
+            llm_setup=self._llm,
             dalle_client=dalle_client,
             dalle_deployment=config.dalle_deployment,
             pixabay_api_key=config.pixabay_api_key,
@@ -88,18 +70,14 @@ class EnhancedLandingPageCreatorSystem:
     def _verify_deployments(self) -> None:
         """Smoke-test each configured API endpoint."""
         try:
-            self._gpt_client.chat.completions.create(
-                model=self._config.azure_openai_deployment,
-                messages=[{"role": "user", "content": "Hello"}],
-                max_completion_tokens=10,
-            )
-            print(f"✅ GPT deployment '{self._config.azure_openai_deployment}' verified")
+            verify_llm(self._llm)
         except Exception as exc:
+            provider = self._config.llm_provider
             raise RuntimeError(
-                f"❌ GPT deployment '{self._config.azure_openai_deployment}' failed: {exc}"
+                f"❌ LLM provider '{provider}' (model '{self._llm.model}') failed: {exc}"
             ) from exc
 
-        if self._config.dalle_deployment:
+        if self._config.dalle_deployment and self._config.llm_provider == "azure":
             try:
                 dalle = AzureOpenAI(
                     api_key=self._config.dalle_api_key or self._config.azure_openai_api_key,
@@ -115,6 +93,8 @@ class EnhancedLandingPageCreatorSystem:
                 print(f"✅ DALL-E deployment '{self._config.dalle_deployment}' verified")
             except Exception as exc:
                 print(f"⚠️  DALL-E test failed: {exc}")
+        elif self._config.dalle_deployment:
+            print("ℹ️  DALL-E skipped (requires LLM_PROVIDER=azure)")
         else:
             print("ℹ️  DALL-E not configured")
 

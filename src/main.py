@@ -28,6 +28,9 @@ def main() -> None:
     try:
         # ── Configuration ────────────────────────────────────
         config = load_config()
+        print(f"🤖 LLM provider: {config.llm_provider}")
+        if config.llm_provider != "azure":
+            print("   Tip: choose image source 'none' or 'pixabay' (DALL-E needs Azure).")
         system = EnhancedLandingPageCreatorSystem(config)
 
         # ── Business info ────────────────────────────────────
