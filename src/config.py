@@ -32,7 +32,8 @@ class Config:
 
     # Groq — free tier at https://console.groq.com
     groq_api_key: Optional[str] = None
-    groq_model: str = "llama-3.3-70b-versatile"
+    # llama-3.1-8b-instant: 30K TPM free (vs 12K for 70b) — avoids 429 errors
+    groq_model: str = "llama-3.1-8b-instant"
     groq_base_url: str = "https://api.groq.com/openai/v1"
 
     # Ollama — local, free at https://ollama.com
@@ -96,7 +97,7 @@ def load_config(env_path: Optional[str] = None) -> Config:
     azure_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
 
     groq_key = os.getenv("GROQ_API_KEY")
-    groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    groq_model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
     groq_base_url = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 
     ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")

@@ -14,7 +14,8 @@ import json
 import logging
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor
+# ThreadPoolExecutor removed — free-tier branch uses sequential execution
+# to stay within Groq's 12K tokens/min rate limit.
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
@@ -164,19 +165,19 @@ class EnhancedLandingPageCreatorSystem:
                 f"Minimum 200 words per agent response."
             )
 
-            # ══ PHASE 1 — Strategy + Content (parallel) ══════
-            print("⚡ Phase 1: Strategy + Content agents …")
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                f_strategy = pool.submit(
-                    self._run_agent, "strategy",
-                    f"Develop a comprehensive landing page strategy:\n{context}",
-                )
-                f_content = pool.submit(
-                    self._run_agent, "content",
-                    f"Create high-converting content:\n{context}",
-                )
-                strategy_result = f_strategy.result()
-                content_result = f_content.result()
+            # ══ PHASE 1 — Strategy + Content (sequential for free-tier TPM limits) ══
+            print("⚡ Phase 1: Strategy agent …")
+            strategy_result = self._run_agent(
+                "strategy",
+                f"Develop a comprehensive landing page strategy:\n{context}",
+            )
+            time.sleep(5)  # cooldown — stay under Groq free-tier 12K TPM limit
+            print("⚡ Phase 1: Content agent …")
+            content_result = self._run_agent(
+                "content",
+                f"Create high-converting content:\n{context}",
+            )
+            time.sleep(5)
 
             # Retry if too short
             if len(strategy_result.strip()) < 100:
@@ -200,40 +201,32 @@ class EnhancedLandingPageCreatorSystem:
                 f"CONTENT FRAMEWORK:\n{content_result}"
             )
 
-            # ══ PHASE 2 — Sections + Image (parallel) ════════
-            print("⚡ Phase 2: Sections + Image …")
+            # ══ PHASE 2 — Sections + Image (sequential for free-tier TPM limits) ══
+            print("⚡ Phase 2: Section agents (sequential — free-tier mode) …")
             section_msgs = {
-                "navbar": f"Create navbar for {btype} {theme}-themed page with industry-appropriate navigation.",
-                "hero": f"Create hero section for {btype} {theme}-themed page. Focus on {guidance['key_values'][0]} and {guidance['key_values'][1]}.",
-                "features": f"Create features section for {btype} {theme}-themed page. Highlight {', '.join(guidance['focus_areas'])}.",
+                "navbar":       f"Create navbar for {btype} {theme}-themed page with industry-appropriate navigation.",
+                "hero":         f"Create hero section for {btype} {theme}-themed page. Focus on {guidance['key_values'][0]} and {guidance['key_values'][1]}.",
+                "features":     f"Create features section for {btype} {theme}-themed page. Highlight {', '.join(guidance['focus_areas'])}.",
                 "testimonials": f"Create testimonials for {btype} {theme}-themed page. Use {guidance['social_proof']} approach. USE BOOTSTRAP ICONS FOR AVATARS.",
-                "cta": f"Create CTA section for {btype} {theme}-themed page. Use {guidance['urgency_type']} urgency.",
-                "footer": f"Create footer for {btype} {theme}-themed page with appropriate contact info.",
+                "cta":          f"Create CTA section for {btype} {theme}-themed page. Use {guidance['urgency_type']} urgency.",
+                "footer":       f"Create footer for {btype} {theme}-themed page with appropriate contact info.",
             }
 
-            with ThreadPoolExecutor(max_workers=7) as pool:
-                # Image agent
-                f_image = pool.submit(
-                    self._run_agent, "image",
-                    f"Create image suggestions for {btype} with {theme} theme:\n{enriched}",
-                )
-                # Section agents
-                section_futures = {
-                    name: pool.submit(
-                        self._run_agent, name,
-                        f"{msg}\n\n{enriched}",
-                    )
-                    for name, msg in section_msgs.items()
-                }
+            sections = {}
+            for name, msg in section_msgs.items():
+                print(f"  → {name} …")
+                result = self._run_agent(name, f"{msg}\n\n{enriched}")
+                if len(result.strip()) < 50:
+                    result = f"FALLBACK: Create {name} section for {btype} with Bootstrap icons and {theme} theme."
+                sections[name] = result
+                time.sleep(5)  # cooldown between agents
 
-                sections = {}
-                for name, fut in section_futures.items():
-                    result = fut.result()
-                    if len(result.strip()) < 50:
-                        result = f"FALLBACK: Create {name} section for {btype} with Bootstrap icons and {theme} theme."
-                    sections[name] = result
-
-                image_agent_response = f_image.result()
+            print("  → image …")
+            image_agent_response = self._run_agent(
+                "image",
+                f"Create image suggestions for {btype} with {theme} theme:\n{enriched}",
+            )
+            time.sleep(5)
 
             # Resolve hero image
             hero_url, img_source = self._image_service.get_hero_image(
